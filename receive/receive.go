@@ -9,31 +9,38 @@ import (
 func main() {
 	url := "amqp://guest:guest@localhost:5672/"
 	conn, err := amqp.Dial(url)
-	if err != nil {
-		panic(err)
-	}
+	failOnError(err)
 	defer conn.Close()
 
 	ch, err := conn.Channel()
-	if err != nil {
-		panic(err)
-	}
+	failOnError(err)
 	defer ch.Close()
 
+	ch.Qos(10, 0, false)
 	msgs, err := ch.Consume(
 		"red",    // queue
 		"golang", // consumer
-		true,     // auto-ack
+		false,    // auto-ack
 		false,    // exclusive
 		false,    // no-local
 		false,    // no-wait
 		nil,      // args
 	)
-	if err != nil {
-		panic(err)
-	}
+	failOnError(err)
 
 	for d := range msgs {
-		fmt.Printf("Received a message: %s \n", d.Body)
+		msg := string(d.Body)
+		fmt.Printf("Received a message: %v \n", msg)
+
+		ch.Ack(d.DeliveryTag, false)
+		if msg == "cancel" {
+			ch.Cancel("golang", false)
+		}
+	}
+}
+
+func failOnError(err error) {
+	if err != nil {
+		panic(err)
 	}
 }
